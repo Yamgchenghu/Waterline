@@ -1,3 +1,8 @@
 dist/
 build/
+build_test/
+build_*/
+testout*/
 *.idsig
+*.log
+.DS_Store
