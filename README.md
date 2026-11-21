@@ -2,7 +2,7 @@
 
 一个用原生 Android Java 编写的 2D 水流物理解谜游戏。画线、搭弧、推动杯子、利用火焰与机关，把水引进杯子并装满 95%。
 
-> **下载 APK**：见 [Releases](https://github.com/Yamgchenghu/Waterline/releases/latest)。
+> **下载 APK**：见 [Releases](https://github.com/Yamgchenghu/dshproject-Waterline/releases/latest)。
 
 ## 游戏内容
 
