@@ -91,7 +91,7 @@ public final class TutorialStore {
 
     private static File file(Context c) { return new File(c.getFilesDir(), FILE); }
 
-    private static final int BUNDLED_VERSION = 7;
+    private static final int BUNDLED_VERSION = 8;
     private static boolean bundledChecked;
     private static JSONObject cache;
     private static void ensureBundled(Context c) {

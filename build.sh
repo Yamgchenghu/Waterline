@@ -6,7 +6,7 @@ BT="$SDK/bt/android-14"
 JAR="$SDK/platform/android-34-ext12/android.jar"
 AAPT2="/usr/bin/aapt2"
 KEYSTORE="$ROOT/tools/waterline.keystore"
-OUT="$ROOT/dist/流水入杯-正式版-v1.0.40.apk"
+OUT="$ROOT/dist/流水入杯-正式版-v1.0.41.apk"
 
 cd "$ROOT"
 rm -rf build dist

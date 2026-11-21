@@ -6,7 +6,7 @@
 
 ## 游戏内容
 
-- 16 个正式关卡，按顺序解锁
+- 18 个正式关卡，按顺序解锁
 - 内置 1–16 关官方通关教程，可模拟播放
 - 达到 95% 杯量即通关
 - 水珠、线、杯子、弧线、机关均为实时物理模拟
@@ -66,7 +66,7 @@
 产物：
 
 ```text
-dist/流水入杯-正式版-v1.0.40.apk
+dist/流水入杯-正式版-v1.0.41.apk
 ```
 
 ## 目录
@@ -75,7 +75,7 @@ dist/流水入杯-正式版-v1.0.40.apk
 android/
   src/                  Java 源码
   res/                  图标、主题、字符串
-  assets/levels/        16 个关卡 JSON
+  assets/levels/        18 个关卡 JSON
   assets/tutorials.json 官方教程存档
   assets/fire_ring.png  火环贴图
 build.sh                构建、打包、签名
