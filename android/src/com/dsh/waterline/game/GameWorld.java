@@ -78,6 +78,8 @@ public final class GameWorld {
 
     private double accumulator = 0.0;
     private double motionClock = 0.0;
+    private boolean bubbleBurstFrame;
+    private double bubbleBurstCooldown;
     private boolean allSpawnedFlag = false;
 
     public static final class Snap {
@@ -721,6 +723,8 @@ public final class GameWorld {
             for (Bar b : physics.bars) b.calmEligible = true;
         }
         physics.calmMode = false;
+        bubbleBurstFrame = false;
+        if (bubbleBurstCooldown > 0) bubbleBurstCooldown = Math.max(0, bubbleBurstCooldown - dt);
         updateSpecialMechanisms(dt);
         updateHazards(dt);
         updateCollection(dt);
@@ -986,12 +990,19 @@ public final class GameWorld {
         }
     }
 
-    private void markTriggeredLines(Level.CircleObj c) {
+    private void markAllBubbleLines() {
         for (Bar b : physics.bars) {
             if (b.tag != Tags.LINE || b.inactive) continue;
-            if (barCircleDistance(b, c.cx, c.cy) < c.radius + b.radius) {
-                b.bubbleTriggered = true;
+            boolean touches = false;
+            for (CircleState cs : bubbles) {
+                if (barCircleDistance(b, cs.def.cx, cs.def.cy)
+                        < cs.def.radius + b.radius) { touches = true; break; }
             }
+            if (!touches) for (CircleState cs : poisonBalls) {
+                if (barCircleDistance(b, cs.def.cx, cs.def.cy)
+                        < cs.def.radius + b.radius) { touches = true; break; }
+            }
+            if (touches) b.bubbleTriggered = true;
         }
     }
 
@@ -1038,20 +1049,26 @@ public final class GameWorld {
 
         // Bubble / poison balls trigger when touched by a gravity object.
         for (CircleState cs : bubbles) {
-            if (!cs.used && !cs.def.hidden && touched(cs.def)) {
+            if (bubbleBurstCooldown <= 0 && !bubbleBurstFrame
+                    && !cs.used && !cs.def.hidden && touched(cs.def)) {
                 cs.used = true;
+                bubbleBurstFrame = true;
+                bubbleBurstCooldown = 0.20;
                 markTriggeredDrops(cs.def);
-                markTriggeredLines(cs.def);
+                markAllBubbleLines();
                 int n = releasedCount(cs.def.radius, 0.0005) * 2;
                 for (int k = 0; k < n; k++) spawnReleasedDrop(cs.def.cx, cs.def.cy, false, true);
                 addSteam(cs.def.cx, cs.def.cy, 0.03);
             }
         }
         for (CircleState cs : poisonBalls) {
-            if (!cs.used && !cs.def.hidden && touched(cs.def)) {
+            if (bubbleBurstCooldown <= 0 && !bubbleBurstFrame
+                    && !cs.used && !cs.def.hidden && touched(cs.def)) {
                 cs.used = true;
+                bubbleBurstFrame = true;
+                bubbleBurstCooldown = 0.20;
                 markTriggeredDrops(cs.def);
-                markTriggeredLines(cs.def);
+                markAllBubbleLines();
                 int n = releasedCount(cs.def.radius, 0.0010) * 2;
                 for (int k = 0; k < n; k++) spawnReleasedDrop(cs.def.cx, cs.def.cy, true, true);
                 addSteam(cs.def.cx, cs.def.cy, 0.02);
