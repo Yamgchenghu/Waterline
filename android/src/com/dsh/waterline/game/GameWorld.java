@@ -1352,7 +1352,7 @@ public final class GameWorld {
             if (Math.hypot(d.x - c.cx, d.y - c.cy) < c.radius + d.radius) return true;
         }
         for (Bar b : physics.bars) {
-            if (b.fixed || b.inactive) continue;
+            if (b.inactive || b.tag != Tags.LINE) continue;
             double sweep = (Math.hypot(b.x - b.prevX, b.y - b.prevY)
                     + Math.abs(b.angle - b.prevAngle) * b.boundRadius) * 0.55;
             double reach = c.radius + b.radius + sweep;
