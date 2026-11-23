@@ -882,7 +882,7 @@ public final class GameWorld {
                 r.trigger.def.offsetX = r.pivotX - b.x;
                 r.trigger.def.offsetY = r.pivotY - b.y;
             }
-            r.remainingDeg -= step;
+            r.remainingDeg -= step * sgn;
             if (Math.abs(r.remainingDeg) <= 1e-9) rotations.remove(i);
         }
         for (int i = translations.size() - 1; i >= 0; i--) {
@@ -921,10 +921,25 @@ public final class GameWorld {
             ts.cooldown = 0.25;
             if (ts.bar != null) {
                 if (ts.def.mode == 1) {
-                    double rad = Math.toRadians(ts.def.angleDeg);
-                    translations.add(new Translation(ts.bar, ts.target,
-                            ts.def.distance, Math.cos(rad), Math.sin(rad),
-                            ts.def.moveSpeed));
+                    double sx = ts.bar.x + ts.def.offsetX;
+                    double sy = ts.bar.y + ts.def.offsetY;
+                    double dx, dy, dist;
+                    if (ts.def.hasEndpoint) {
+                        double ex = ts.def.endpointRelative ? sx + ts.def.endX : ts.def.endX;
+                        double ey = ts.def.endpointRelative ? sy + ts.def.endY : ts.def.endY;
+                        dx = ex - sx; dy = ey - sy;
+                        dist = Math.hypot(dx, dy);
+                    } else {
+                        double rad = Math.toRadians(ts.def.angleDeg);
+                        dx = Math.cos(rad); dy = Math.sin(rad);
+                        dist = ts.def.distance;
+                    }
+                    if (dist > 1e-6) {
+                        translations.add(new Translation(ts.bar, ts.target, dist,
+                                dx / Math.max(1e-9, Math.hypot(dx, dy)),
+                                dy / Math.max(1e-9, Math.hypot(dx, dy)),
+                                ts.def.moveSpeed));
+                    }
                 } else {
                     boolean fixed = ts.def.mode == 2;
                     double px = ts.bar.x + ts.def.offsetX;

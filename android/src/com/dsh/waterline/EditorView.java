@@ -108,6 +108,8 @@ public final class EditorView extends View {
     private int triggerMode = 0;
     private double triggerDistance = 0.05;
     private double triggerMoveSpeed = 0.10;
+    private boolean triggerEndpointRelative = false;
+    private double triggerEndX = 0.5, triggerEndY = 0.5;
     private Object endpointObject;
     private int endpointIndex = -1;
     private double dragStartX, dragStartY, dragEndX, dragEndY;
@@ -776,15 +778,23 @@ public final class EditorView extends View {
         EditText count = new EditText(getContext());
         count.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         count.setText(String.valueOf(triggerCount));
-        EditText dist = numberField(triggerDistance * 100);
         LinearLayout box = new LinearLayout(getContext());
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding((int) dp(18), (int) dp(4), (int) dp(18), 0);
+        EditText endX = null, endY = null;
+        CheckBox relative = null;
         if (mode == 1) {
-            box.addView(label("平移方向 °（0=右，90=下）"));
-            box.addView(angle);
-            box.addView(label("平移距离 cm"));
-            box.addView(dist);
+            relative = new CheckBox(getContext());
+            relative.setText("终点使用相对坐标");
+            relative.setTextSize(11);
+            relative.setChecked(triggerEndpointRelative);
+            endX = numberField(triggerEndX);
+            endY = numberField(triggerEndY);
+            box.addView(relative);
+            box.addView(label("终点 X（绝对坐标，或相对偏移）"));
+            box.addView(endX);
+            box.addView(label("终点 Y（绝对坐标，或相对偏移）"));
+            box.addView(endY);
             box.addView(label("平移速度 m/s"));
             box.addView(speed);
         } else {
@@ -795,16 +805,22 @@ public final class EditorView extends View {
         }
         box.addView(label("触发次数（0 = 无限）"));
         box.addView(count);
+        final EditText fx = endX, fy = endY;
+        final CheckBox frel = relative;
         new AlertDialog.Builder(getContext()).setTitle(
                         mode == 1 ? "平移触发器" : mode == 2 ? "定点旋转触发器" : "旋转触发器")
-                .setMessage("设置后点一个无物理机关放置触发点")
+                .setMessage("设置后点一个无物理机关放置触发点；终点可在端点模式拖动")
                 .setView(box)
                 .setPositiveButton("去放置", (d, w) -> {
                     triggerMode = mode;
                     triggerAngle = clampDouble(parse(angle, mode == 1 ? 0 : 90), -3600, 3600);
                     triggerSpeed = clampDouble(parse(speed, 90), -1440, 1440);
                     triggerMoveSpeed = clampDouble(parse(speed, 0.10), 0.01, 2.0);
-                    triggerDistance = clampDouble(parse(dist, 5.0), 0.1, 100.0) / 100.0;
+                    if (mode == 1 && fx != null && fy != null) {
+                        triggerEndpointRelative = frel != null && frel.isChecked();
+                        triggerEndX = parse(fx, 0.5);
+                        triggerEndY = parse(fy, 0.5);
+                    }
                     try { triggerCount = Math.max(0, Integer.parseInt(count.getText().toString().trim())); }
                     catch (Exception e) { triggerCount = 0; }
                     triggerPlacement = true;
@@ -841,7 +857,8 @@ public final class EditorView extends View {
         pushUndo();
         level.triggers.add(new Level.RotateTrigger(type, index, wx - cx, wy - cy,
                 triggerAngle, triggerSpeed, triggerCount, triggerMode,
-                triggerDistance, triggerMoveSpeed));
+                triggerDistance, triggerMoveSpeed, triggerMode == 1,
+                triggerEndpointRelative, triggerEndX, triggerEndY));
         save();
         triggerPlacement = false;
         performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
@@ -868,11 +885,29 @@ public final class EditorView extends View {
         for (Level.RotateTrigger t : level.triggers) {
             double[] ctr = triggerCenter(t);
             if (ctr == null) continue;
-            float tx = X(ctr[0] + t.offsetX), ty = Y(ctr[1] + t.offsetY);
+            double sx = ctr[0] + t.offsetX, sy = ctr[1] + t.offsetY;
+            float tx = X(sx), ty = Y(sy);
+            int tc = t.mode == 1 ? 0xFFB48CFF : t.mode == 2 ? 0xFFFF6B4A : 0xFFFFB347;
+            if (t.mode == 1 && t.hasEndpoint) {
+                double ex = t.endpointRelative ? sx + t.endX : t.endX;
+                double ey = t.endpointRelative ? sy + t.endY : t.endY;
+                int ec = desaturate(tc, 0.5f);
+                stroke.setStyle(Paint.Style.STROKE);
+                stroke.setStrokeWidth(dp(1.5f));
+                stroke.setColor(ec);
+                stroke.setPathEffect(t.endpointRelative ? null
+                        : new DashPathEffect(new float[]{dp(7), dp(5)}, -vTime * 16));
+                c.drawLine(tx, ty, X(ex), Y(ey), stroke);
+                stroke.setPathEffect(null);
+                fill.setColor(ec);
+                c.drawCircle(X(ex), Y(ey), dp(6), fill);
+                stroke.setColor(0xFFFFFFFF);
+                c.drawCircle(X(ex), Y(ey), dp(6), stroke);
+            }
             float cx = X(ctr[0]), cy = Y(ctr[1]);
             stroke.setStyle(Paint.Style.STROKE);
             stroke.setStrokeWidth(dp(1));
-            stroke.setColor(0x66FFB347);
+            stroke.setColor(0x55FFFFFF);
             c.drawLine(cx, cy, tx, ty, stroke);
             path.reset();
             path.moveTo(tx, ty - dp(7));
@@ -880,15 +915,22 @@ public final class EditorView extends View {
             path.lineTo(tx, ty + dp(7));
             path.lineTo(tx - dp(7), ty);
             path.close();
-            int tc = t.mode == 1 ? 0xFFB48CFF : t.mode == 2 ? 0xFFFF6B4A : 0xFFFFB347;
             fill.setColor(tc);
             c.drawPath(path, fill);
-            drawText(c, String.format(Locale.US, "%s %.0f° %s",
-                            t.mode == 1 ? "平移" : t.mode == 2 ? "定点" : "旋转",
-                            t.angleDeg, t.count == 0 ? "∞" : ("×" + t.count)),
+            drawText(c, String.format(Locale.US, "%s %s", t.mode == 1 ? "平移"
+                            : t.mode == 2 ? "定点" : "旋转",
+                            t.count == 0 ? "∞" : ("×" + t.count)),
                     tx + dp(10), ty - dp(8), 8, tc, false);
         }
     }
+
+    private int desaturate(int color, float factor) {
+        float[] hsv = new float[3];
+        Color.colorToHSV(color, hsv);
+        hsv[1] *= factor;
+        return Color.HSVToColor(0xFF, hsv);
+    }
+
 
     private void showAddMenu() {
         String[] items = {"直线", "弧线", "圆", "文字",
@@ -933,8 +975,15 @@ public final class EditorView extends View {
         for (Level.RotateTrigger t : level.triggers) {
             double[] ctr = triggerCenter(t);
             if (ctr == null) continue;
-            double d = Math.hypot(ctr[0] + t.offsetX - x, ctr[1] + t.offsetY - y);
+            double sx = ctr[0] + t.offsetX, sy = ctr[1] + t.offsetY;
+            double d = Math.hypot(sx - x, sy - y);
             if (d < best) { best = d; hit = t; idx = 0; }
+            if (t.mode == 1 && t.hasEndpoint) {
+                double ex = t.endpointRelative ? sx + t.endX : t.endX;
+                double ey = t.endpointRelative ? sy + t.endY : t.endY;
+                d = Math.hypot(ex - x, ey - y);
+                if (d < best) { best = d; hit = t; idx = 1; }
+            }
         }
         if (hit == null) return false;
         pushUndo();
@@ -949,9 +998,18 @@ public final class EditorView extends View {
         if (endpointObject instanceof Level.RotateTrigger) {
             Level.RotateTrigger t = (Level.RotateTrigger) endpointObject;
             double[] ctr = triggerCenter(t);
-            if (ctr != null) {
+            if (ctr == null) return;
+            double sx = ctr[0] + t.offsetX, sy = ctr[1] + t.offsetY;
+            if (endpointIndex == 0) {
                 t.offsetX = x - ctr[0];
                 t.offsetY = y - ctr[1];
+            } else if (t.mode == 1) {
+                t.hasEndpoint = true;
+                if (t.endpointRelative) {
+                    t.endX = x - sx; t.endY = y - sy;
+                } else {
+                    t.endX = x; t.endY = y;
+                }
             }
             return;
         }
