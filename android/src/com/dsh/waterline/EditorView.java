@@ -105,6 +105,9 @@ public final class EditorView extends View {
     private boolean triggerPlacement;
     private double triggerAngle = 90, triggerSpeed = 90;
     private int triggerCount = 0;
+    private int triggerMode = 0;
+    private double triggerDistance = 0.05;
+    private double triggerMoveSpeed = 0.10;
     private Object endpointObject;
     private int endpointIndex = -1;
     private double dragStartX, dragStartY, dragEndX, dragEndY;
@@ -767,27 +770,41 @@ public final class EditorView extends View {
                 }).show();
     }
 
-    private void showTriggerDialog() {
-        EditText angle = numberField(triggerAngle);
-        EditText speed = numberField(triggerSpeed);
+    private void showTriggerDialog(int mode) {
+        EditText angle = numberField(mode == 1 ? 0 : triggerAngle);
+        EditText speed = numberField(mode == 1 ? triggerMoveSpeed : triggerSpeed);
         EditText count = new EditText(getContext());
         count.setInputType(android.text.InputType.TYPE_CLASS_NUMBER);
         count.setText(String.valueOf(triggerCount));
+        EditText dist = numberField(triggerDistance * 100);
         LinearLayout box = new LinearLayout(getContext());
         box.setOrientation(LinearLayout.VERTICAL);
         box.setPadding((int) dp(18), (int) dp(4), (int) dp(18), 0);
-        box.addView(label("旋转角度 °（可负）"));
-        box.addView(angle);
-        box.addView(label("角速度 °/s"));
-        box.addView(speed);
+        if (mode == 1) {
+            box.addView(label("平移方向 °（0=右，90=下）"));
+            box.addView(angle);
+            box.addView(label("平移距离 cm"));
+            box.addView(dist);
+            box.addView(label("平移速度 m/s"));
+            box.addView(speed);
+        } else {
+            box.addView(label("旋转角度 °（可负，正=顺时针）"));
+            box.addView(angle);
+            box.addView(label("角速度 °/s"));
+            box.addView(speed);
+        }
         box.addView(label("触发次数（0 = 无限）"));
         box.addView(count);
-        new AlertDialog.Builder(getContext()).setTitle("旋转触发器")
+        new AlertDialog.Builder(getContext()).setTitle(
+                        mode == 1 ? "平移触发器" : mode == 2 ? "定点旋转触发器" : "旋转触发器")
                 .setMessage("设置后点一个无物理机关放置触发点")
                 .setView(box)
                 .setPositiveButton("去放置", (d, w) -> {
-                    triggerAngle = clampDouble(parse(angle, 90), -3600, 3600);
+                    triggerMode = mode;
+                    triggerAngle = clampDouble(parse(angle, mode == 1 ? 0 : 90), -3600, 3600);
                     triggerSpeed = clampDouble(parse(speed, 90), -1440, 1440);
+                    triggerMoveSpeed = clampDouble(parse(speed, 0.10), 0.01, 2.0);
+                    triggerDistance = clampDouble(parse(dist, 5.0), 0.1, 100.0) / 100.0;
                     try { triggerCount = Math.max(0, Integer.parseInt(count.getText().toString().trim())); }
                     catch (Exception e) { triggerCount = 0; }
                     triggerPlacement = true;
@@ -823,7 +840,8 @@ public final class EditorView extends View {
         }
         pushUndo();
         level.triggers.add(new Level.RotateTrigger(type, index, wx - cx, wy - cy,
-                triggerAngle, triggerSpeed, triggerCount));
+                triggerAngle, triggerSpeed, triggerCount, triggerMode,
+                triggerDistance, triggerMoveSpeed));
         save();
         triggerPlacement = false;
         performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP);
@@ -862,23 +880,29 @@ public final class EditorView extends View {
             path.lineTo(tx, ty + dp(7));
             path.lineTo(tx - dp(7), ty);
             path.close();
-            fill.setColor(0xEEFFB347);
+            int tc = t.mode == 1 ? 0xFFB48CFF : t.mode == 2 ? 0xFFFF6B4A : 0xFFFFB347;
+            fill.setColor(tc);
             c.drawPath(path, fill);
-            drawText(c, String.format(Locale.US, "%.0f° %s", t.angleDeg,
-                            t.count == 0 ? "∞" : ("×" + t.count)),
-                    tx + dp(10), ty - dp(8), 8, 0xFFFFD58A, false);
+            drawText(c, String.format(Locale.US, "%s %.0f° %s",
+                            t.mode == 1 ? "平移" : t.mode == 2 ? "定点" : "旋转",
+                            t.angleDeg, t.count == 0 ? "∞" : ("×" + t.count)),
+                    tx + dp(10), ty - dp(8), 8, tc, false);
         }
     }
 
     private void showAddMenu() {
-        String[] items = {"直线", "弧线", "圆", "文字", "旋转触发器"};
+        String[] items = {"直线", "弧线", "圆", "文字",
+                "平移触发器（紫）", "旋转触发器·中心（橙）",
+                "定点旋转触发器（橙红）"};
         new AlertDialog.Builder(getContext()).setTitle("添加")
                 .setItems(items, (d, w) -> {
                     if (w == 0) showStraightMenu();
                     else if (w == 1) showArcMenu();
                     else if (w == 2) chooseTool(TOOL_CIRCLE);
                     else if (w == 3) chooseTool(TOOL_TEXT);
-                    else showTriggerDialog();
+                    else if (w == 4) showTriggerDialog(1);
+                    else if (w == 5) showTriggerDialog(0);
+                    else showTriggerDialog(2);
                 }).show();
     }
 
@@ -906,6 +930,12 @@ public final class EditorView extends View {
             d = Math.hypot(o.cx + o.radius - x, o.cy - y);
             if (d < best) { best = d; hit = o; idx = 1; }
         }
+        for (Level.RotateTrigger t : level.triggers) {
+            double[] ctr = triggerCenter(t);
+            if (ctr == null) continue;
+            double d = Math.hypot(ctr[0] + t.offsetX - x, ctr[1] + t.offsetY - y);
+            if (d < best) { best = d; hit = t; idx = 0; }
+        }
         if (hit == null) return false;
         pushUndo();
         endpointObject = hit;
@@ -916,6 +946,15 @@ public final class EditorView extends View {
     }
 
     private void updateEndpoint(double x, double y) {
+        if (endpointObject instanceof Level.RotateTrigger) {
+            Level.RotateTrigger t = (Level.RotateTrigger) endpointObject;
+            double[] ctr = triggerCenter(t);
+            if (ctr != null) {
+                t.offsetX = x - ctr[0];
+                t.offsetY = y - ctr[1];
+            }
+            return;
+        }
         if (endpointObject instanceof Level.CircleObj) {
             Level.CircleObj o = (Level.CircleObj) endpointObject;
             if (endpointIndex == 0) {

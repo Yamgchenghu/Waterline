@@ -156,11 +156,20 @@ public final class Level {
         public double angleDeg;
         public double speedDeg;
         public int count; // 0 = unlimited
+        public int mode; // 0 center rotate, 1 translate, 2 fixed-point rotate
+        public double distance; // metres, translation mode
+        public double moveSpeed; // metres/second, translation mode
         public RotateTrigger(int targetType, int targetIndex, double offsetX, double offsetY,
                              double angleDeg, double speedDeg, int count) {
+            this(targetType, targetIndex, offsetX, offsetY, angleDeg, speedDeg, count, 0, 0, 0);
+        }
+        public RotateTrigger(int targetType, int targetIndex, double offsetX, double offsetY,
+                             double angleDeg, double speedDeg, int count,
+                             int mode, double distance, double moveSpeed) {
             this.targetType = targetType; this.targetIndex = targetIndex;
             this.offsetX = offsetX; this.offsetY = offsetY;
             this.angleDeg = angleDeg; this.speedDeg = speedDeg; this.count = count;
+            this.mode = mode; this.distance = distance; this.moveSpeed = moveSpeed;
         }
     }
 

@@ -46,6 +46,7 @@ public final class GameWorld {
     public final ArrayList<Mover> movers = new ArrayList<>();
     public final ArrayList<TriggerState> triggers = new ArrayList<>();
     public final ArrayList<Rotation> rotations = new ArrayList<>();
+    public final ArrayList<Translation> translations = new ArrayList<>();
     public final Map<Object, Bar> barByObject = new IdentityHashMap<>();
     public Bar fireBall;
     public Bar cupBody;
@@ -136,11 +137,29 @@ public final class GameWorld {
     public static final class Rotation {
         public final Bar bar;
         public final Object target;
+        public final TriggerState trigger;
         public double remainingDeg;
         public final double speedDeg;
-        public Rotation(Bar bar, Object target, double remainingDeg, double speedDeg) {
-            this.bar = bar; this.target = target;
+        public final double pivotX, pivotY;
+        public final boolean fixedPivot;
+        public Rotation(Bar bar, Object target, TriggerState trigger,
+                        double remainingDeg, double speedDeg,
+                        double pivotX, double pivotY, boolean fixedPivot) {
+            this.bar = bar; this.target = target; this.trigger = trigger;
             this.remainingDeg = remainingDeg; this.speedDeg = speedDeg;
+            this.pivotX = pivotX; this.pivotY = pivotY; this.fixedPivot = fixedPivot;
+        }
+    }
+
+    public static final class Translation {
+        public final Bar bar;
+        public final Object target;
+        public double remaining;
+        public final double dirX, dirY, speed;
+        public Translation(Bar bar, Object target, double remaining,
+                           double dirX, double dirY, double speed) {
+            this.bar = bar; this.target = target; this.remaining = remaining;
+            this.dirX = dirX; this.dirY = dirY; this.speed = speed;
         }
     }
 
@@ -209,7 +228,7 @@ public final class GameWorld {
         lines.clear(); supportBars.clear(); fireBars.clear(); mudBars.clear();
         bubbles.clear(); poisonBalls.clear(); poisonSources.clear(); steams.clear(); movers.clear();
         solidBalls.clear(); iceBalls.clear(); purifiers.clear(); breakables.clear(); blinkers.clear();
-        triggers.clear(); rotations.clear(); barByObject.clear();
+        triggers.clear(); rotations.clear(); translations.clear(); barByObject.clear();
         fireBall = null; cupBody = null;
         motionClock = 0.0;
         state = State.READY;
@@ -835,7 +854,7 @@ public final class GameWorld {
     }
 
     private void updateTriggers(double dt) {
-        // Apply queued rotations first.
+        // Apply queued rotations and translations first.
         for (int i = rotations.size() - 1; i >= 0; i--) {
             Rotation r = rotations.get(i);
             double step = Math.min(Math.abs(r.remainingDeg), Math.abs(r.speedDeg) * dt);
@@ -843,6 +862,12 @@ public final class GameWorld {
             double sgn = Math.signum(r.remainingDeg);
             double deltaRad = Math.toRadians(step * sgn);
             Bar b = r.bar;
+            if (r.fixedPivot) {
+                double dx = b.x - r.pivotX, dy = b.y - r.pivotY;
+                double c = Math.cos(deltaRad), sn = Math.sin(deltaRad);
+                b.x = r.pivotX + dx * c - dy * sn;
+                b.y = r.pivotY + dx * sn + dy * c;
+            }
             double oldAngle = b.angle;
             b.angle += deltaRad;
             b.cacheRotation();
@@ -852,14 +877,23 @@ public final class GameWorld {
                 double ny = b.oneWayNx * sn + b.oneWayNy * c;
                 b.oneWayNx = nx; b.oneWayNy = ny;
             }
-            if (r.target instanceof Level.SegObj) {
-                Level.SegObj sg = (Level.SegObj) r.target;
-                double c = Math.cos(b.angle), sn = Math.sin(b.angle);
-                sg.x1 = b.x - c * b.halfLen; sg.y1 = b.y - sn * b.halfLen;
-                sg.x2 = b.x + c * b.halfLen; sg.y2 = b.y + sn * b.halfLen;
+            syncTarget(r.bar, r.target);
+            if (r.fixedPivot && r.trigger != null) {
+                r.trigger.def.offsetX = r.pivotX - b.x;
+                r.trigger.def.offsetY = r.pivotY - b.y;
             }
             r.remainingDeg -= step;
             if (Math.abs(r.remainingDeg) <= 1e-9) rotations.remove(i);
+        }
+        for (int i = translations.size() - 1; i >= 0; i--) {
+            Translation t = translations.get(i);
+            double step = Math.min(Math.abs(t.remaining), Math.abs(t.speed) * dt);
+            if (step <= 1e-9) { translations.remove(i); continue; }
+            t.bar.x += t.dirX * step;
+            t.bar.y += t.dirY * step;
+            syncTarget(t.bar, t.target);
+            t.remaining -= step;
+            if (Math.abs(t.remaining) <= 1e-9) translations.remove(i);
         }
         for (TriggerState ts : triggers) {
             ts.cooldown = Math.max(0, ts.cooldown - dt);
@@ -886,16 +920,40 @@ public final class GameWorld {
             if (ts.def.count > 0) ts.remaining--;
             ts.cooldown = 0.25;
             if (ts.bar != null) {
-                boolean merged = false;
-                for (Rotation r : rotations) {
-                    if (r.bar == ts.bar) {
-                        r.remainingDeg += ts.def.angleDeg;
-                        merged = true; break;
+                if (ts.def.mode == 1) {
+                    double rad = Math.toRadians(ts.def.angleDeg);
+                    translations.add(new Translation(ts.bar, ts.target,
+                            ts.def.distance, Math.cos(rad), Math.sin(rad),
+                            ts.def.moveSpeed));
+                } else {
+                    boolean fixed = ts.def.mode == 2;
+                    double px = ts.bar.x + ts.def.offsetX;
+                    double py = ts.bar.y + ts.def.offsetY;
+                    boolean merged = false;
+                    for (Rotation r : rotations) {
+                        if (r.bar == ts.bar && r.fixedPivot == fixed
+                                && (!fixed || (Math.abs(r.pivotX - px) < 1e-6
+                                && Math.abs(r.pivotY - py) < 1e-6))) {
+                            r.remainingDeg += ts.def.angleDeg;
+                            merged = true; break;
+                        }
                     }
+                    if (!merged) rotations.add(new Rotation(ts.bar, ts.target, ts,
+                            ts.def.angleDeg, ts.def.speedDeg, px, py, fixed));
                 }
-                if (!merged) rotations.add(new Rotation(ts.bar, ts.target,
-                        ts.def.angleDeg, ts.def.speedDeg));
             }
+        }
+    }
+
+    private void syncTarget(Bar b, Object target) {
+        if (target instanceof Level.SegObj) {
+            Level.SegObj sg = (Level.SegObj) target;
+            double c = Math.cos(b.angle), sn = Math.sin(b.angle);
+            sg.x1 = b.x - c * b.halfLen; sg.y1 = b.y - sn * b.halfLen;
+            sg.x2 = b.x + c * b.halfLen; sg.y2 = b.y + sn * b.halfLen;
+        } else if (target instanceof Level.CircleObj) {
+            Level.CircleObj o = (Level.CircleObj) target;
+            o.cx = b.x; o.cy = b.y;
         }
     }
 

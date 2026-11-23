@@ -680,11 +680,13 @@ public final class PlayView extends View {
             } else continue;
             float tx = X(cx + ts.def.offsetX), ty = Y(cy + ts.def.offsetY);
             float pr = dp(5) + (float) Math.sin(vTime * 5) * dp(1);
-            fill.setColor(0xCCFFB347);
+            int tc = ts.def.mode == 1 ? 0xCCB48CFF
+                    : ts.def.mode == 2 ? 0xCCFF6B4A : 0xCCFFB347;
+            fill.setColor(tc);
             c.drawCircle(tx, ty, pr, fill);
             stroke.setStyle(Paint.Style.STROKE);
             stroke.setStrokeWidth(dp(1.5f));
-            stroke.setColor(0xFFFFE0A0);
+            stroke.setColor(tc);
             c.drawCircle(tx, ty, pr + dp(3), stroke);
         }
     }

@@ -81,7 +81,8 @@ public final class LevelStore {
         for (Level.RotateTrigger r : L.triggers) {
             tr.put(new JSONArray().put(r.targetType).put(r.targetIndex)
                     .put(r.offsetX).put(r.offsetY).put(r.angleDeg)
-                    .put(r.speedDeg).put(r.count));
+                    .put(r.speedDeg).put(r.count).put(r.mode)
+                    .put(r.distance).put(r.moveSpeed));
         }
         root.put("triggers", tr);
         return root.toString();
@@ -142,9 +143,12 @@ public final class LevelStore {
         if (tr != null) for (int i = 0; i < tr.length(); i++) {
             JSONArray a = tr.getJSONArray(i);
             if (a.length() >= 7) {
+                int mode = a.length() > 7 ? a.optInt(7, 0) : 0;
+                double dist = a.length() > 8 ? a.optDouble(8, 0) : 0;
+                double ms = a.length() > 9 ? a.optDouble(9, 0) : 0;
                 L.triggers.add(new Level.RotateTrigger(a.getInt(0), a.getInt(1),
                         a.getDouble(2), a.getDouble(3), a.getDouble(4),
-                        a.getDouble(5), a.getInt(6)));
+                        a.getDouble(5), a.getInt(6), mode, dist, ms));
             }
         }
         JSONArray tx = root.optJSONArray("texts");
