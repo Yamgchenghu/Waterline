@@ -986,6 +986,15 @@ public final class GameWorld {
         }
     }
 
+    private void markTriggeredLines(Level.CircleObj c) {
+        for (Bar b : physics.bars) {
+            if (b.tag != Tags.LINE || b.inactive) continue;
+            if (barCircleDistance(b, c.cx, c.cy) < c.radius + b.radius) {
+                b.bubbleTriggered = true;
+            }
+        }
+    }
+
     private void markTriggeredDrops(Level.CircleObj c) {
         for (Drop d : physics.drops) {
             if (d.removed || d.ghost || d.secondaryRelease) continue;
@@ -1032,6 +1041,7 @@ public final class GameWorld {
             if (!cs.used && !cs.def.hidden && touched(cs.def)) {
                 cs.used = true;
                 markTriggeredDrops(cs.def);
+                markTriggeredLines(cs.def);
                 int n = releasedCount(cs.def.radius, 0.0005) * 2;
                 for (int k = 0; k < n; k++) spawnReleasedDrop(cs.def.cx, cs.def.cy, false, true);
                 addSteam(cs.def.cx, cs.def.cy, 0.03);
@@ -1041,6 +1051,7 @@ public final class GameWorld {
             if (!cs.used && !cs.def.hidden && touched(cs.def)) {
                 cs.used = true;
                 markTriggeredDrops(cs.def);
+                markTriggeredLines(cs.def);
                 int n = releasedCount(cs.def.radius, 0.0010) * 2;
                 for (int k = 0; k < n; k++) spawnReleasedDrop(cs.def.cx, cs.def.cy, true, true);
                 addSteam(cs.def.cx, cs.def.cy, 0.02);
@@ -1368,7 +1379,7 @@ public final class GameWorld {
             if (Math.hypot(d.x - c.cx, d.y - c.cy) < c.radius + d.radius) return true;
         }
         for (Bar b : physics.bars) {
-            if (b.inactive || b.tag != Tags.LINE) continue;
+            if (b.inactive || b.bubbleTriggered || b.tag != Tags.LINE) continue;
             double sweep = (Math.hypot(b.x - b.prevX, b.y - b.prevY)
                     + Math.abs(b.angle - b.prevAngle) * b.boundRadius) * 0.55;
             double reach = c.radius + b.radius + sweep;

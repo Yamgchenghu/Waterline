@@ -53,6 +53,7 @@ public final class Bar {
     public boolean bouncy = false;
     public boolean breakable = false;
     public boolean inactive = false;
+    public boolean bubbleTriggered = false;
     public double breakCooldown = 0.0;
     public double prevX, prevY;
     public double prevAngle;
