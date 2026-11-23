@@ -18,6 +18,8 @@ public final class Drop {
     public double fade = 0.0; // seconds left, 1.5 at entry
     public double horizForce = 0.0; // temporary initial force (N)
     public double horizForceTime = 0.0;
+    public boolean secondaryRelease = false;
+    public boolean bubbleTriggered = false;
 
     public static final double MASS = 0.0125;
     public static final double INV_MASS = 1.0 / MASS;

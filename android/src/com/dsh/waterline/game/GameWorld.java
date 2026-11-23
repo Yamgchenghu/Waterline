@@ -826,6 +826,10 @@ public final class GameWorld {
     }
 
     private void spawnReleasedDrop(double x, double y, boolean poison) {
+        spawnReleasedDrop(x, y, poison, false);
+    }
+
+    private void spawnReleasedDrop(double x, double y, boolean poison, boolean secondary) {
         double a = rng.nextDouble() * Math.PI * 2;
         double sp = 0.25 + rng.nextDouble() * 0.55;
         Drop d = new Drop(x + Math.cos(a) * DROP_RADIUS, y + Math.sin(a) * DROP_RADIUS,
@@ -835,6 +839,7 @@ public final class GameWorld {
         d.vx = Math.cos(a) * sp;
         d.vy = Math.sin(a) * sp;
         d.poison = poison;
+        d.secondaryRelease = secondary;
         physics.addDrop(d);
         physics.wakeAll();
         // released droplets do not belong to the faucet's 225 count
@@ -981,6 +986,15 @@ public final class GameWorld {
         }
     }
 
+    private void markTriggeredDrops(Level.CircleObj c) {
+        for (Drop d : physics.drops) {
+            if (d.removed || d.ghost || d.secondaryRelease) continue;
+            if (Math.hypot(d.x - c.cx, d.y - c.cy) < c.radius + d.radius) {
+                d.bubbleTriggered = true;
+            }
+        }
+    }
+
     private void updateHazards(double dt) {
         // Poison faucets emit one small poison droplet at a time.
         for (PoisonSource ps : poisonSources) {
@@ -1017,16 +1031,18 @@ public final class GameWorld {
         for (CircleState cs : bubbles) {
             if (!cs.used && !cs.def.hidden && touched(cs.def)) {
                 cs.used = true;
+                markTriggeredDrops(cs.def);
                 int n = releasedCount(cs.def.radius, 0.0005) * 2;
-                for (int k = 0; k < n; k++) spawnReleasedDrop(cs.def.cx, cs.def.cy, false);
+                for (int k = 0; k < n; k++) spawnReleasedDrop(cs.def.cx, cs.def.cy, false, true);
                 addSteam(cs.def.cx, cs.def.cy, 0.03);
             }
         }
         for (CircleState cs : poisonBalls) {
             if (!cs.used && !cs.def.hidden && touched(cs.def)) {
                 cs.used = true;
+                markTriggeredDrops(cs.def);
                 int n = releasedCount(cs.def.radius, 0.0010) * 2;
-                for (int k = 0; k < n; k++) spawnReleasedDrop(cs.def.cx, cs.def.cy, true);
+                for (int k = 0; k < n; k++) spawnReleasedDrop(cs.def.cx, cs.def.cy, true, true);
                 addSteam(cs.def.cx, cs.def.cy, 0.02);
             }
         }
@@ -1348,7 +1364,7 @@ public final class GameWorld {
 
     private boolean touched(Level.CircleObj c) {
         for (Drop d : physics.drops) {
-            if (d.removed || d.ghost) continue;
+            if (d.removed || d.ghost || d.secondaryRelease || d.bubbleTriggered) continue;
             if (Math.hypot(d.x - c.cx, d.y - c.cy) < c.radius + d.radius) return true;
         }
         for (Bar b : physics.bars) {
