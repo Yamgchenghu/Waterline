@@ -9,13 +9,13 @@ import java.io.InputStream;
 
 /** The bundled official levels. */
 public final class OfficialLevels {
-    public static final int COUNT = 18;
+    public static final int COUNT = 19;
     public static final String[] NAMES = {
             "第一关 · 初见", "第二关 · 三角", "第三关 · 推杯",
             "第四关 · 多线", "第五关 · 清线", "第六关 · 岩浆",
             "第七关", "第八关", "第九关",
             "第十关", "第十一关", "第十二关", "第十三关", "第十四关",
-            "第十五关", "第十六关", "第十七关", "第十八关"
+            "第十五关", "第十六关", "第十七关", "第十八关", "第十九关"
     };
 
     private OfficialLevels() {}
