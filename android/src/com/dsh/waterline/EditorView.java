@@ -2333,7 +2333,11 @@ public final class EditorView extends View {
                     level.circles.clear(); level.circles.addAll(L.circles);
                     level.poisonFaucets.clear(); level.poisonFaucets.addAll(L.poisonFaucets);
                     level.texts.clear(); level.texts.addAll(L.texts);
+                    level.triggers.clear();
                     level.faucetX = L.faucetX; level.cupCx = L.cupCx; level.cupBottomY = L.cupBottomY;
+                    triggerPlacement = false;
+                    endpointObject = null;
+                    endpointIndex = -1;
                     save(); invalidate();
                 }).setNegativeButton("取消", null).show();
     }
